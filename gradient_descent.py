@@ -121,65 +121,40 @@ class GradientDescent:
                 Euclidean norm of w^(t)-w^(t-1)
 
         """
-        # w = np.zeros_like(f.weights_)
-        # best_w = w.copy()
-        # best_val = float('inf')
-        # sum_w = np.zeros_like(w)
-        # w_prev = w.copy()
-        # delta = self.tol_
-        # t = 0
-        #
-        # while t < self.max_iter_ and delta >= self.tol_:
-        #     eta = self.learning_rate_.lr_step(t=t)
-        #     grad = f.compute_jacobian(X=X, y=y)
-        #     w_prev = w.copy()
-        #     w -= eta * grad
-        #     delta = np.linalg.norm(w - w_prev)
-        #
-        #     current_val = f.compute_output(X=X, y=y)
-        #     if current_val < best_val:
-        #         best_val = current_val
-        #         best_w = w.copy()
-        #
-        #     sum_w += w
-        #
-        #     self.callback_(solver=self, weight=w, val=current_val, grad=grad, t=t, eta=eta, delta=delta)
-        #     t += 1
-        #
-        # if self.out_type_ == "last":
-        #     return w
-        # elif self.out_type_ == "best":
-        #     return best_w
-        # elif self.out_type_ == "average":
-        #     return sum_w / t
-        # else:
-        #     raise ValueError("Invalid output type")
-
-        t, delta, prev_step = 0, self.tol_, np.copy(f.weights)
-        best_val, best_weights, cweights = np.Inf, None, np.zeros_like(f.weights)
+        t, delta = 0, self.tol_
+        prev_weights = np.copy(f.weights)
+        best_val, best_weights = np.inf, None
+        cumulative_weights = np.zeros_like(f.weights)
 
         while t < self.max_iter_ and delta >= self.tol_:
-            # forward pass - computing the loss and saving all intermediate calculations
+            # Compute current value and gradient
             val = f.compute_output(X=X, y=y)
-            # backward pass - In neural networks, it is dependant on the existing forward pass
             grad = f.compute_jacobian(X=X, y=y)
-            # deciding on the step size
+
+            # Determine learning rate and update weights
             eta = self.learning_rate_.lr_step(f=f, x=X, dx=-grad, t=t)
-
-            # Performing descent step - taking a step in the negative direction
             f.weights -= eta * grad
-            cweights += f.weights
+            cumulative_weights += f.weights
 
-            # Update variables for next iteration
-            t, prev_step, delta = t + 1, np.copy(f.weights), np.linalg.norm(f.weights - prev_step)
+            # Update delta and iteration counter
+            delta = np.linalg.norm(f.weights - prev_weights)
+            prev_weights = np.copy(f.weights)
+            t += 1
+
+            # Update best weights if current value is the best so far
             if val < best_val:
-                best_val, best_weights = val, f.weights
+                best_val = val
+                best_weights = np.copy(f.weights)
 
             # Call the callback function
             self.callback_(solver=self, weight=np.copy(f.weights), val=val, grad=grad, t=t, eta=eta, delta=delta)
 
+        # Determine the output based on the specified output type
         if self.out_type_ == "last":
             return f.weights
-        if self.out_type_ == "best":
+        elif self.out_type_ == "best":
             return best_weights
-        return cweights / t
+        elif self.out_type_ == "average":
+            return cumulative_weights / t
+        else:
+            raise ValueError(f"Invalid out_type_ '{self.out_type_}' specified.")
